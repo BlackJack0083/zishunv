@@ -11,6 +11,53 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
 		<link rel="stylesheet" href="assets/css/main.css" />
 		<noscript><link rel="stylesheet" href="assets/css/noscript.css" /></noscript>
+		<style>
+			.model-preview {
+				position: relative;
+				width: 100%;
+				height: 400px;
+				margin: 20px 0;
+				cursor: pointer;
+				overflow: hidden;
+				border-radius: 8px;
+				box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+			}
+			.model-preview img {
+				width: 100%;
+				height: 100%;
+				object-fit: cover;
+				transition: transform 0.3s ease;
+			}
+			.model-preview:hover img {
+				transform: scale(1.05);
+			}
+			.model-container {
+				display: none;
+				position: fixed;
+				top: 0;
+				left: 0;
+				width: 100%;
+				height: 100%;
+				background: rgba(0,0,0,0.9);
+				z-index: 1000;
+			}
+			.model-container.active {
+				display: block;
+			}
+			.model-viewer {
+				width: 100%;
+				height: 100%;
+			}
+			.close-button {
+				position: absolute;
+				top: 20px;
+				right: 20px;
+				color: white;
+				font-size: 30px;
+				cursor: pointer;
+				z-index: 1001;
+			}
+		</style>
 	</head>
 	<body class="is-preload">
 
@@ -46,7 +93,21 @@
 
                     <h2>浦潇月《自梳》项目</h2>
                     
-                    <div class="image main"><img src="images/pic01.jpg" alt="" /></div>
+                    <div class="model-preview" onclick="showModel('models/model1.glb')">
+                        <img src="images/model1_preview.jpg" alt="模型1预览" />
+                    </div>
+                    <div class="model-preview" onclick="showModel('models/model2.glb')">
+                        <img src="images/model2_preview.jpg" alt="模型2预览" />
+                    </div>
+                    <div class="model-preview" onclick="showModel('models/model3.glb')">
+                        <img src="images/model3_preview.jpg" alt="模型3预览" />
+                    </div>
+
+                    <div class="model-container" id="model-container">
+                        <div class="close-button" onclick="hideModel()">&times;</div>
+                        <div class="model-viewer" id="model-viewer"></div>
+                    </div>
+
                     <p>Donec eget ex magna. Interdum et malesuada fames ac ante ipsum primis in faucibus. Pellentesque venenatis dolor imperdiet dolor mattis sagittis. Praesent rutrum sem diam, vitae egestas enim auctor sit amet. Pellentesque leo mauris, consectetur id ipsum sit amet, fergiat. Pellentesque in mi eu massa lacinia malesuada et a elit. Donec urna ex, lacinia in purus ac, pretium pulvinar mauris. Nunc lorem mauris, fringilla in aliquam at, euismod in lectus. Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas. Curabitur sapien risus, commodo eget turpis at, elementum convallis enim turpis, lorem ipsum dolor sit amet nullam.</p>
                     <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Duis dapibus rutrum facilisis. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Etiam tristique libero eu nibh porttitor fermentum. Nullam venenatis erat id vehicula viverra. Nunc ultrices eros ut ultricies condimentum. Mauris risus lacus, blandit sit amet venenatis non, bibendum vitae dolor. Nunc lorem mauris, fringilla in aliquam at, euismod in lectus. Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas. In non lorem sit amet elit placerat maximus. Pellentesque aliquam maximus risus. Donec eget ex magna. Interdum et malesuada fames ac ante ipsum primis in faucibus. Pellentesque venenatis dolor imperdiet dolor mattis sagittis. Praesent rutrum sem diam, vitae egestas enim auctor sit amet. Pellentesque leo mauris, consectetur id ipsum.</p>
                 </section>
@@ -69,6 +130,83 @@
         <script src="assets/js/breakpoints.min.js"></script>
         <script src="assets/js/util.js"></script>
         <script src="assets/js/main.js"></script>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+		<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+		<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+		<script>
+			let scene, camera, renderer, controls, currentModel;
+
+			function initScene() {
+				scene = new THREE.Scene();
+				camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+				camera.position.z = 5;
+				
+				renderer = new THREE.WebGLRenderer({ antialias: true });
+				renderer.setSize(window.innerWidth, window.innerHeight);
+				renderer.setClearColor(0x000000, 0);
+				document.getElementById('model-viewer').appendChild(renderer.domElement);
+				
+				const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+				scene.add(ambientLight);
+				
+				const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
+				directionalLight.position.set(0, 1, 0);
+				scene.add(directionalLight);
+				
+				controls = new THREE.OrbitControls(camera, renderer.domElement);
+				controls.enableDamping = true;
+				controls.dampingFactor = 0.05;
+			}
+
+			function showModel(modelPath) {
+				document.getElementById('model-container').classList.add('active');
+				initScene();
+				
+				const loader = new THREE.GLTFLoader();
+				loader.load(modelPath, function(gltf) {
+					if (currentModel) {
+						scene.remove(currentModel);
+					}
+					currentModel = gltf.scene;
+					scene.add(currentModel);
+					
+					const box = new THREE.Box3().setFromObject(currentModel);
+					const center = box.getCenter(new THREE.Vector3());
+					const size = box.getSize(new THREE.Vector3());
+					
+					const maxDim = Math.max(size.x, size.y, size.z);
+					const fov = camera.fov * (Math.PI / 180);
+					let cameraZ = Math.abs(maxDim / Math.sin(fov / 2));
+					
+					camera.position.z = cameraZ * 1.5;
+					camera.lookAt(center);
+					controls.target.copy(center);
+				});
+				
+				animate();
+			}
+
+			function hideModel() {
+				document.getElementById('model-container').classList.remove('active');
+				if (renderer) {
+					renderer.dispose();
+				}
+			}
+
+			function animate() {
+				requestAnimationFrame(animate);
+				controls.update();
+				renderer.render(scene, camera);
+			}
+
+			window.addEventListener('resize', function() {
+				if (camera) {
+					camera.aspect = window.innerWidth / window.innerHeight;
+					camera.updateProjectionMatrix();
+					renderer.setSize(window.innerWidth, window.innerHeight);
+				}
+			});
+		</script>
 
 	</body>
 </html>
